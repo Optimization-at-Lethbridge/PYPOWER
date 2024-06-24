@@ -24,6 +24,7 @@ from pypower.makeSbus import makeSbus
 from pypower.dcpf import dcpf
 from pypower.makeYbus import makeYbus
 from pypower.newtonpf import newtonpf
+from pypower.newtonpf_vqls import newtonpf
 from pypower.fdpf import fdpf
 from pypower.gausspf import gausspf
 from pypower.makeB import makeB
@@ -31,6 +32,19 @@ from pypower.pfsoln import pfsoln
 from pypower.printpf import printpf
 from pypower.savecase import savecase
 from pypower.int2ext import int2ext
+from pypower.case3 import case3
+from pypower.case5 import case5
+from pypower.case9 import case9
+from pypower.case4gs import case4gs
+from pypower.case6ww import case6ww
+from pypower.case14 import case14
+from pypower.case24_ieee_rts import case24_ieee_rts
+from pypower.case30 import case30
+from pypower.case39 import case39
+from pypower.case57 import case57
+from pypower.case118 import case118
+from pypower.case300 import case300
+from pennylane import numpy as np
 
 from pypower.idx_bus import PD, QD, VM, VA, GS, BUS_TYPE, PV, PQ, REF
 from pypower.idx_brch import PF, PT, QF, QT
@@ -323,4 +337,52 @@ def runpf(casedata=None, ppopt=None, fname='', solvedcase=''):
 
 
 if __name__ == '__main__':
-    runpf()
+    ppopt = ppoption(PF_ALG=1, PF_DC=False, VERBOSE=2)
+
+    print('Case 3, PF, AC...................')
+    ppc = case3()
+    runpf(ppc, ppopt)
+
+    print('Case 4gs, PF, AC...................')
+    ppc = case4gs()
+    runpf(ppc, ppopt)
+
+    print('Case 5, PF, AC...................')
+    ppc = case5()
+    runpf(ppc, ppopt)
+
+    print('Case 6ww, PF, AC...................')
+    ppc = case6ww()
+    runpf(ppc, ppopt)
+
+    print('Case 9, PF, AC...................')
+    ppc = case9()
+    runpf(ppc, ppopt)
+
+    print('Case 14, PF, AC...................')
+    ppc = case14()
+    runpf(ppc, ppopt)
+
+    print('Case 24 IEEE RTS, PF, AC...................')
+    ppc = case24_ieee_rts()
+    runpf(ppc, ppopt)
+
+    print('Case 30, PF, AC...................')
+    ppc = case30()
+    runpf(ppc, ppopt)
+
+    #print('Case 39...................')
+    #ppc = case39()
+    #runpf(ppc)
+
+    #print('Case 57...................')
+    #ppc = case57()
+    #runpf(ppc)
+
+    #print('Case 118...................')
+    #ppc = case118()
+    #runpf(ppc)
+
+    #print('Case 300...................')
+    #ppc = case300()
+    #runpf(ppc)
