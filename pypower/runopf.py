@@ -71,14 +71,6 @@ if __name__ == '__main__':
     ppc = case3()
     runopf(ppc, ppopt)
 
-    #print('Case 4gs,  OPF, DC...................')
-    #ppc = case4gs()
-    #runopf(ppc, ppopt)
-
-    print('Case 5,  OPF, DC...................')
-    ppc = case5()
-    runopf(ppc, ppopt)
-
     print('Case 6ww, OPF, DC...................')
     ppc = case6ww()
     runopf(ppc, ppopt)

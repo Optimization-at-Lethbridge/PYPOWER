@@ -9,6 +9,9 @@ from numpy import array, Inf, any, isnan, ones, r_, finfo, \
     zeros, dot, absolute, log, flatnonzero as find
 
 from numpy.linalg import norm
+from pypower.vqls_helper import VQLSSolver
+from scipy.sparse.linalg import spilu, LinearOperator
+from pennylane import numpy as np
 
 from scipy.sparse import vstack, hstack, eye, csr_matrix as sparse
 from scipy.sparse.linalg import spsolve
@@ -17,6 +20,35 @@ from pypower.pipsver import pipsver
 
 
 EPS = finfo(float).eps
+
+
+def solve_with_vqls(vqls_solver, Ab_dense, bb, residual_threshold):
+    while True:
+        # Solve the system using VQLSSolver
+        dxdlam = vqls_solver.vqls_solve()
+
+        c_solution = np.linalg.solve(Ab_dense, bb)
+        # Quantum solution
+        q_solution = dxdlam
+        # Print classical and quantum solutions
+        #print(f"Classical solution: {c_solution}")
+        #print(f"Quantum solution: {q_solution}")
+
+        # Calculate the error between classical and quantum solutions
+        error = np.linalg.norm(c_solution - q_solution) / np.linalg.norm(c_solution)
+        print(f"Error between classical and quantum solutions: {error}")
+
+        # Calculate the residual norm
+        residual_norm = np.linalg.norm(np.dot(Ab_dense, dxdlam) - bb)/(1+np.linalg.norm(bb))
+        print(f" Residual norm : {residual_norm}")
+        # Check if the residual norm is within the threshold
+        if residual_norm <= residual_threshold:
+            break
+        else:
+            print(
+                f"Residual norm ({residual_norm}) is greater than the threshold ({residual_threshold}). Recalculating dxdlam...")
+
+    return dxdlam
 
 
 def pips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None,
@@ -156,7 +188,7 @@ def pips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None,
                      following: feascond, gradcond, compcond, costcond, gamma,
                      stepsize, obj, alphap, alphad
                    - C{message} - exit message
-               - C{lmbda} - dictionary containing the Langrange and Kuhn-Tucker
+               - C{lmbda} - dictionary containing the Langrange and Kuhn-Tucker 
                  multipliers on the constraints, with keys:
                    - C{eqnonlin} - nonlinear equality constraints
                    - C{ineqnonlin} - nonlinear inequality constraints
@@ -200,13 +232,13 @@ def pips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None,
     if opt is None: opt = {}
     # options
     if "feastol" not in opt:
-        opt["feastol"] = 1e-06
+        opt["feastol"] = 1e-05
     if "gradtol" not in opt:
-        opt["gradtol"] = 1e-06
+        opt["gradtol"] = 1e-05
     if "comptol" not in opt:
-        opt["comptol"] = 1e-06
+        opt["comptol"] = 1e-05
     if "costtol" not in opt:
-        opt["costtol"] = 1e-06
+        opt["costtol"] = 1e-05
     if "max_it" not in opt:
         opt["max_it"] = 150
     if "max_red" not in opt:
@@ -387,7 +419,25 @@ def pips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None,
         ])
         bb = r_[-N, -g]
 
-        dxdlam = spsolve(Ab.tocsr(), bb)
+        #dxdlam = spsolve(Ab.tocsr(), bb)
+        #print(f" Classical Solution : {dxdlam}")
+        nnz = Ab.nnz
+        Ab_dense = Ab.toarray()
+        total_elements = Ab_dense.shape[0]*Ab_dense.shape[1]
+        density = nnz / total_elements
+        print(f" matrix density : {density}")
+
+        # Define a threshold for the residual norm
+        residual_threshold = 1e-2
+        # Using an Incomplete LU preconditioner
+        ilu = spilu(Ab_dense)
+        left_preconditioner = LinearOperator(Ab_dense.shape, ilu.solve)
+        # Apply the preconditioner to Ab and bb
+        preconditioned_Ab = left_preconditioner @ Ab_dense
+        preconditioned_bb = left_preconditioner @ bb
+        vqls_solver = VQLSSolver(preconditioned_Ab, preconditioned_bb, num_layers=7, conv_tol=1e-17, max_iterations=500, stepsize = 0.01)
+        # Solve the system with the given threshold
+        dxdlam = solve_with_vqls(vqls_solver, preconditioned_Ab, preconditioned_bb, residual_threshold)
 
         if any(isnan(dxdlam)):
             if opt["verbose"]:
