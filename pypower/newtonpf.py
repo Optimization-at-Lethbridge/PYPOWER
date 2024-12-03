@@ -14,7 +14,9 @@ from scipy.sparse.linalg import spsolve
 
 from pypower.dSbus_dV import dSbus_dV
 from pypower.ppoption import ppoption
-
+from pennylane import numpy as np
+from .HHL_conversion import hhl_helper
+from pypower.vqls_helper import VQLSSolver
 
 def newtonpf(Ybus, Sbus, V0, ref, pv, pq, ppopt=None):
     """Solves the power flow using a full Newton's method.
@@ -45,6 +47,8 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, ppopt=None):
     tol     = ppopt['PF_TOL']
     max_it  = ppopt['PF_MAX_IT']
     verbose = ppopt['VERBOSE']
+    is_quantum  = ppopt['IS_QUANTUM']
+    quantum_alg = ppopt['QUANTUM_ALG']
 
     ## initialize
     converged = 0
@@ -98,6 +102,25 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, ppopt=None):
 
         ## compute update step
         dx = -1 * spsolve(J, F)
+        if is_quantum:
+            J_dense = J.toarray()
+            if quantum_alg == 1:
+                sys.stdout.write("\nApplying HHL quantum algorithm.\n")
+                hhl = hhl_helper()  ## initialize an instance of hhl_helper
+                q_solution = -1 * hhl.run_HHL(J_dense, F, 1e-8)  ## update with HHL
+            else:
+                sys.stdout.write("\nApplying VQLS hybrid quantum-classical algorithm.\n")
+                # Create an instance of the VQLSSolver class
+                vqls_solver = VQLSSolver(J_dense, F, num_layers=7, max_iterations=500, conv_tol=1e-17, stepsize=0.1)
+                # Solve the system of linear equation using VQLS
+                q_solution = -1 * vqls_solver.vqls_solve()
+            dx = q_solution
+            c_solution = np.linalg.solve(J_dense, F)
+
+            # Calculate the error between classical and quantum solutions
+            error = np.linalg.norm(c_solution - q_solution)
+            print(f"  Error between classical and quantum solutions: {error}")
+
 
         ## update voltage
         if npv:
